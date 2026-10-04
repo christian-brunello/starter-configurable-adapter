@@ -1,0 +1,60 @@
+# Autotools build-tree output (keep configure / Makefile.in / aclocal.m4 tracked)
+Makefile
+autom4te.cache/
+config.log
+config.status
+libtool
+configure~
+*.in~
+stamp-h1
+src/stamp-h1
+src/autoconf.h
+
+# Libtool / compiler products
+.deps/
+.libs/
+*.o
+*.lo
+*.la
+*.lai
+*.a
+*.so
+*.so.*
+*.d
+
+# Generated install helpers
+starter-configurable-adapter.pc
+
+# Built programs
+/src/starter-configurable-adapter
+
+# Texinfo / TeX intermediate files (keep version.texi tracked)
+doc/*.info
+doc/*.pdf
+doc/*.t2p/
+doc/*.t2d/
+doc/*.aux
+doc/*.cp
+doc/*.cps
+doc/*.fn
+doc/*.fns
+doc/*.ky
+doc/*.log
+doc/*.pg
+doc/*.toc
+doc/*.tp
+doc/*.tps
+doc/*.vr
+doc/*.vrs
+doc/stamp-vti
+
+# Editor / OS junk
+*~
+*.swp
+*.swo
+.DS_Store
+
+*.log
+core
+core.*
+vgcore.*

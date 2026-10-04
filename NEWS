@@ -1,0 +1,7 @@
+STARTER Configurable Adapter NEWS - User visible changes
+
+* First release 1.0.0 (2026-10-04) [Christian Brunello]
+
+- Initial release of starter-configurable-adapter: HTTP facade over a single
+  source plugin with adapter-owned value store and synchronous writes.
+- Shipped temporary dummy plugin for API collaudo.

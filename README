@@ -1,0 +1,67 @@
+STARTER Configurable Adapter
+============================
+
+1. OVERVIEW
+===========
+
+starter-configurable-adapter (STCA) is an independent HTTP process that
+loads one plugin to talk to an external source and exposes a common
+numeric JSON API for configurable-service. This tree ships the core and
+the in-tree `dummy` example plugin; product plugins (e.g. Ariston) are
+separate repositories (one plugin per repo).
+
+Read path:
+
+  plugin  →  signal data-ready (GHashTable)  →  adapter memory  →  GET /data
+  →  configurable-service  →  starter STInput
+
+Write path:
+
+  starter STOutput  →  configurable-service  →  PUT/POST /data
+  →  stca_plugin_write_value(s)  →  external source
+
+For the technical manual (concepts + configuration/HTTP reference):
+
+    $ make -C doc info   # Info
+    $ make doc           # PDF (needs TeX)
+
+2. PREREQUISITES
+================
+
+* GLib 2.0 / GObject / GIO / GModule (libglib2.0-dev)
+* libxml2 (libxml2-dev)
+* json-glib (libjson-glib-dev)
+* libsoup 3.x or 2.4 >= 2.58 (libsoup-3.0-dev or libsoup2.4-dev)
+* Autotools (autoconf, automake, libtool)
+* Texinfo (makeinfo) to build the manual; TeX for PDF
+
+3. BUILDING FROM SOURCE
+=======================
+
+    $ ./autogen.sh
+    $ ./configure
+    $ make
+    $ sudo make install
+
+4. RUNNING
+==========
+
+    $ starter-configurable-adapter --config /path/to/adapter.stca.xml
+
+See examples/dummy/ for a temporary plugin that exercises the HTTP API.
+Out-of-tree plugins are built separately and loaded with `--plugin-dir`.
+Details are in the Texinfo manual.
+
+5. LICENSE
+==========
+
+* The adapter executable, plugins, and examples are distributed under the
+  GNU General Public License (GPL) version 3 or later. See COPYING.
+* The libstarter-configurable-adapter library and public headers are
+  distributed under the GNU Lesser General Public License (LGPL)
+  version 2.1 or later. See COPYING.LESSER.
+
+6. AUTHORS
+==========
+
+See the AUTHORS file for a complete list of contributors.

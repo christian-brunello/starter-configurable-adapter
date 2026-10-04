@@ -1,0 +1,568 @@
+\input texinfo
+@c -*-texinfo-*-
+@setfilename starter-configurable-adapter.info
+@settitle STARTER Configurable Adapter
+@include version.texi
+
+@paragraphindent 0
+
+@copying
+This manual is for starter-configurable-adapter (version @value{VERSION}).
+
+Copyright @copyright{} 2026 Christian Brunello
+
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation;
+with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+A copy of the license is included in the section entitled ``GNU Free
+Documentation License''.
+@end quotation
+@end copying
+
+@dircategory System Administration
+@direntry
+* Configurable Adapter: (starter-configurable-adapter).  STARTER HTTP adapter.
+@end direntry
+
+@titlepage
+@title STARTER Configurable Adapter
+@subtitle Version @value{VERSION}
+@subtitle Independent HTTP bridge for configurable-service
+@author Christian Brunello
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@ifnottex
+@node Top
+@top STARTER Configurable Adapter
+@insertcopying
+@end ifnottex
+
+@contents
+
+@menu
+* Introduction::
+* Concepts::
+* Building and Installing::
+* Running the Adapter::
+* Configuration Overview::
+* Configuration Reference::
+* HTTP Reference::
+* Writing Plugins::
+* Examples Directory::
+* Copying::
+@end menu
+
+@node Introduction
+@unnumbered Introduction
+
+@acronym{STARTER} (@emph{Simple distribuTed smART conTrollER}) is a
+distributed automation core. @command{starter-configurable-service}
+(@acronym{STCS}) bridges the outside world to starter-core inputs and
+outputs using an @acronym{XML} pipeline.
+
+@command{starter-configurable-adapter} (@acronym{STCA}) is a smaller,
+independent process that sits @emph{in front of} @acronym{STCS}. It loads
+exactly one plugin that talks to a complex external source (cloud
+@acronym{API}, fieldbus, @dots{}), keeps a numeric snapshot in memory, and
+exposes that snapshot over a common @acronym{HTTP}/@acronym{JSON} API.
+@acronym{STCS} can then use its existing @code{http-transport} and
+@code{json-reader} / writers against that API---without embedding the
+source protocol inside the service.
+
+This manual is organised in two layers:
+
+@itemize
+@item
+@emph{Presentation} chapters explain what the adapter is, how data moves,
+and how to build and run it.
+@item
+The @ref{Configuration Reference} and @ref{HTTP Reference} spell out
+options and endpoints. @ref{Writing Plugins} explains how to add a new
+source plugin (in-tree or as a separate repository).
+@end itemize
+
+@node Concepts
+@chapter Concepts
+
+@menu
+* Role Versus STCS::
+* One Plugin Per Process::
+* Values and Access Flags::
+* Data Ready Signal::
+* Write Path::
+@end menu
+
+@node Role Versus STCS
+@section Role Versus STCS
+
+Typical end-to-end flows:
+
+@example
+external source
+  → STCA plugin
+  → data-ready → adapter store
+  → GET /data (HTTP JSON)
+  → STCS http-transport + json-reader
+  → starter STInput
+@end example
+
+@example
+starter STOutput
+  → STCS writer + http-transport
+  → PUT/POST /data (HTTP JSON)
+  → STCA write_value(s)
+  → external source
+@end example
+
+Unlike @acronym{STCS}, @acronym{STCA} does @emph{not} own datapoints,
+transports, or starter-core bindings. It owns one plugin instance and one
+in-memory value store, and speaks a fixed numeric @acronym{HTTP} dialect.
+
+@node One Plugin Per Process
+@section One Plugin Per Process
+
+Each adapter process loads plugins from a directory, but the
+configuration must name @emph{exactly one} @code{<plugin>}. That plugin
+collects from the source on its own schedule (timers, threads, @dots{})
+and pushes updates into the adapter. To run two sources, run two adapter
+instances (different ports / configs).
+
+Product plugins are usually separate repositories (one plugin per repo)
+and install into the same plugin directory as the in-tree @code{dummy}
+example.
+
+@node Values and Access Flags
+@section Values and Access Flags
+
+All live values are @code{gdouble}, keyed by a string. Each stored entry
+is an @code{STCAValue}:
+
+@itemize
+@item
+@code{value} --- the number
+@item
+@code{access} --- bitmask of @code{STCA_ACCESS_READ} and/or
+@code{STCA_ACCESS_WRITE}, serialized on the wire as @code{r}, @code{w},
+or @code{rw}
+@end itemize
+
+The @acronym{HTTP} layer rejects writes to keys that are not writable
+(@code{403}) @emph{before} calling the plugin. Unknown keys return
+@code{404}.
+
+@node Data Ready Signal
+@section The @code{data-ready} Signal
+
+The adapter is the owner of the value store. Plugins do not keep a
+long-lived table for @acronym{HTTP}; they build a batch
+(@code{GHashTable} of @code{gchar*} → @code{STCAValue*}), emit
+@code{data-ready}, and the adapter merges a deep copy into
+@code{context->values}.
+
+Emit once per collection cycle (multi-key batch), not once per key.
+
+@node Write Path
+@section Write Path
+
+@code{PUT}/@code{POST} handlers call @code{stca_plugin_write_value} or
+@code{stca_plugin_write_values} synchronously. On success the adapter
+updates the stored numbers for those keys so a subsequent @code{GET}
+reflects the command. The plugin may later emit @code{data-ready} with
+authoritative values read back from the source.
+
+@node Building and Installing
+@chapter Building and Installing
+
+@menu
+* Dependencies::
+* Build Steps::
+@end menu
+
+@node Dependencies
+@section Dependencies
+
+@itemize
+@item GLib 2.0 / GObject / GIO / GModule
+@item libxml2
+@item json-glib
+@item libsoup 3.x, or libsoup 2.4 @math{\ge} 2.58
+@item Autotools (@command{autoconf}, @command{automake}, @command{libtool})
+@item Texinfo (@command{makeinfo}) to build this manual
+@end itemize
+
+There is no dependency on @command{starter-core}.
+
+@node Build Steps
+@section Build Steps
+
+@example
+$ ./autogen.sh
+$ ./configure
+$ make
+$ sudo make install
+@end example
+
+The shared library installs as @code{libstarter-configurable-adapter},
+with pkg-config module @code{starter-configurable-adapter}. The in-tree
+@code{dummy} plugin installs under
+
+@example
+$(libdir)/starter/configurable-adapter/plugins
+@end example
+
+@example
+$ make doc          # PDF manual (requires TeX)
+$ make -C doc info  # Info manual
+@end example
+
+@node Running the Adapter
+@chapter Running the Adapter
+
+@menu
+* Command Line::
+* Logging::
+@end menu
+
+@node Command Line
+@section Command Line
+
+@example
+starter-configurable-adapter [OPTION...]
+@end example
+
+@table @option
+@item -h, --help
+Print a short usage summary and exit.
+
+@item -c, --config=@var{FILE}
+Path to the adapter configuration file (required).
+
+@item -P, --config-preprocessor=@var{CMD}
+Shell command used to preprocess the config before parsing.
+@code{@{F@}} is replaced with the config path. An empty value disables
+preprocessing. Default may also come from
+@env{STCA_CONFIG_PREPROCESSOR}.
+
+@item -p, --plugin-dir=@var{DIR}
+Directory to scan for @code{.so} plugins. Falls back to
+@env{STCA_PLUGIN_PATH}, then the compile-time default install path.
+
+@item -V, --version
+Print the version string and exit.
+@end table
+
+Startup order: scan plugins → parse @acronym{XML} → start @acronym{HTTP}
+server → @code{stca_plugin_start} → @code{g_main_loop_run}.
+
+@node Logging
+@section Logging
+
+The adapter uses GLib message logging. Domains follow component names
+(@code{main}, @code{config}, @code{http}, @code{plugin}, and the
+plugin's own domain). Use the usual GLib environment variables
+(@env{G_MESSAGES_DEBUG}, @dots{}) when debugging.
+
+From the build tree (example with @code{dummy}):
+
+@example
+$ LD_LIBRARY_PATH=lib/.libs \
+    src/starter-configurable-adapter \
+      -c examples/dummy/dummy.stca.xml \
+      -p plugins/dummy/.libs
+@end example
+
+@node Configuration Overview
+@chapter Configuration Overview
+
+Root element @samp{stca} with a @code{version} attribute, one
+@samp{global} block, and exactly one @samp{plugin}:
+
+@example
+<?xml version="1.0" encoding="UTF-8"?>
+<stca version="1">
+  <global>
+    <listen-address>127.0.0.1</listen-address>
+    <listen-port>8080</listen-port>
+    <adapter-name>STCA:Dummy</adapter-name>
+  </global>
+  <plugin name="dummy">
+    <!-- opaque subtree for the plugin -->
+  </plugin>
+</stca>
+@end example
+
+The @code{name} attribute must match @code{stca_plugin_info_get_name()}
+of a scanned module. Child elements of @samp{plugin} are passed unchanged
+to @code{stca_plugin_configure()}.
+
+@node Configuration Reference
+@chapter Configuration Reference
+
+@menu
+* Document and Global Reference::
+* Plugin Element Reference::
+* Out-of-tree Plugins::
+@end menu
+
+@node Document and Global Reference
+@section Document and Global
+
+@table @code
+@item stca/@@version
+Document format version. Use @code{1}.
+
+@item global/listen-address
+Address for the @acronym{HTTP} server (default none / all interfaces
+depending on libsoup listen behaviour; examples use @code{127.0.0.1}).
+
+@item global/listen-port
+@acronym{TCP} port (default @code{8080}).
+
+@item global/adapter-name
+Human-readable name returned by @code{GET /info}
+(default @code{STCA}).
+@end table
+
+@node Plugin Element Reference
+@section Plugin Element
+
+@table @code
+@item plugin/@@name
+Required. Must match a loaded plugin module name.
+
+@item plugin/*
+Opaque to the adapter. Interpreted only by the plugin's
+@code{configure} implementation.
+@end table
+
+@node Out-of-tree Plugins
+@section Out-of-tree Plugins
+
+This package ships only the @code{dummy} example. Product plugins are
+separate repositories---one plugin per repo---and install into the same
+plugin directory. Build them against an installed adapter:
+
+@example
+$ pkg-config --cflags --libs starter-configurable-adapter
+@end example
+
+or against a local build tree:
+
+@example
+$ ./configure --with-stca=/path/to/configurable-adapter
+@end example
+
+@node HTTP Reference
+@chapter HTTP Reference
+
+All successful @acronym{JSON} bodies use @code{Content-Type:
+application/json}. Numbers on the write path are plain @acronym{JSON}
+numbers (or a @acronym{JSON} object of numbers for bulk write).
+
+@menu
+* Health and Info::
+* Reading Data::
+* Writing Data::
+@end menu
+
+@node Health and Info
+@section Health and Info
+
+@table @code
+@item GET /health
+@example
+@{"status":"ok"@}
+@end example
+
+@item GET /info
+@example
+@{
+  "adapter-name": "STCA:Dummy",
+  "adapter-version": "1.0.0",
+  "plugin": "dummy",
+  "plugin-version": "1.0.0"
+@}
+@end example
+@end table
+
+@node Reading Data
+@section Reading Data
+
+@table @code
+@item GET /data
+@acronym{JSON} object keyed by datapoint name. Each value is an object:
+
+@example
+@{
+  "temperature": @{ "value": 21.5, "access": "r" @},
+  "setpoint":    @{ "value": 22.0, "access": "rw" @}
+@}
+@end example
+
+@item GET /data/@var{key}
+Single entry in the same @code{@{ "value", "access" @}} shape, or
+@code{404} if the key is unknown.
+@end table
+
+@node Writing Data
+@section Writing Data
+
+@table @code
+@item PUT /data/@var{key}
+@itemx POST /data/@var{key}
+Body: a @acronym{JSON} number. On success: @code{204 No Content}.
+
+@item PUT /data
+@itemx POST /data
+Body: a @acronym{JSON} object of string keys to numbers. On success:
+@code{204 No Content}.
+@end table
+
+Errors:
+
+@table @code
+@item 403
+Key exists but is not writable, or the plugin rejected the write with a
+permission error.
+
+@item 404
+Unknown key (or missing key in the path).
+
+@item 400
+Malformed @acronym{JSON} body.
+@end table
+
+The adapter checks the stored @code{access} flags before invoking the
+plugin.
+
+@node Writing Plugins
+@chapter Writing Plugins
+
+@menu
+* Plugin Exports::
+* Plugin Lifecycle::
+* Emitting Values::
+* Handling Writes::
+* Building a Plugin::
+@end menu
+
+@node Plugin Exports
+@section Required Exports
+
+Each module must export:
+
+@example
+STCAPluginInfo *stca_plugin_get_info (void);
+GObject        *stca_plugin_create (void);
+@end example
+
+@code{stca_plugin_get_info} returns a new @code{STCAPluginInfo} with a
+stable @code{name} (used in @acronym{XML}) and @code{version}.
+@code{stca_plugin_create} returns a new instance of your
+@code{STCAPlugin} subclass.
+
+@node Plugin Lifecycle
+@section Lifecycle
+
+@enumerate
+@item
+The adapter scans @code{*.so} files and records info by name.
+@item
+Configuration selects one name and calls @code{stca_plugin_create}, then
+@code{stca_plugin_configure(plugin, <plugin> node)}.
+@item
+After the @acronym{HTTP} server is listening, the adapter calls
+@code{stca_plugin_start}.
+@item
+On shutdown it calls @code{stca_plugin_stop}.
+@end enumerate
+
+Implement the virtual methods on @code{STCAPluginClass}:
+@code{configure}, @code{start}, @code{stop}, @code{write_value}, and
+optionally @code{write_values}.
+
+@node Emitting Values
+@section Emitting Values
+
+@example
+GHashTable *batch = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                           g_free,
+                                           (GDestroyNotify) stca_value_free);
+g_hash_table_insert (batch, g_strdup ("temperature"),
+                     stca_value_new (21.5, STCA_ACCESS_READ));
+g_hash_table_insert (batch, g_strdup ("setpoint"),
+                     stca_value_new (22.0,
+                                    STCA_ACCESS_READ | STCA_ACCESS_WRITE));
+stca_plugin_emit_data_ready (STCA_PLUGIN (self), batch);
+g_hash_table_unref (batch);
+@end example
+
+The signal payload is transfer-none for the duration of handlers; the
+adapter copies what it needs.
+
+@node Handling Writes
+@section Handling Writes
+
+@code{write_value} receives @code{(plugin, key, value, error)} and must
+apply the change to the external source synchronously, returning
+@code{FALSE} and setting @code{GError} on failure. Prefer implementing
+@code{write_value}; the default @code{write_values} loops over keys.
+
+@node Building a Plugin
+@section Building and Installing
+
+Link against @code{libstarter-configurable-adapter} and install the
+module with @code{-module -avoid-version} into the adapter plugin
+directory. Public headers live under
+@file{starter/configurable-adapter/} (@file{plugin.h}, @file{log.h}).
+
+Out-of-tree projects typically use Autotools with
+@code{PKG_CHECK_MODULES([STCA], [starter-configurable-adapter])} or
+@option{--with-stca=DIR} pointing at an uninstalled build tree.
+
+@node Examples Directory
+@chapter Examples Directory
+
+@menu
+* Dummy Example::
+@end menu
+
+@node Dummy Example
+@section Dummy (@file{examples/dummy/dummy.stca.xml})
+
+The @code{dummy} plugin is a timer-driven mock used to exercise the
+@acronym{HTTP} API. It emits @code{temperature}, @code{humidity}, and
+@code{online} as read-only, and @code{setpoint} as read-write. The
+plugin option @code{interval-ms} sets the emit period (default
+@code{5000}).
+
+@example
+$ curl http://127.0.0.1:8080/data
+$ curl -X PUT http://127.0.0.1:8080/data/setpoint \
+    -d '22.5' -H 'Content-Type: application/json'
+# temperature is read-only → 403
+@end example
+
+@node Copying
+@appendix Copying
+
+The adapter executable, in-tree plugins, and examples are distributed
+under the GNU General Public License version 3 or later. The
+@code{libstarter-configurable-adapter} library and public headers are
+distributed under the GNU Lesser General Public License version 2.1 or
+later.
+
+@node GNU Free Documentation License
+@appendix GNU Free Documentation License
+@include fdl.texi
+
+@node GNU General Public License
+@appendix GNU General Public License
+@include gpl.texi
+
+@bye
