@@ -17,11 +17,52 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
 #include <string.h>
 
 #include "internals.h"
 
 static char *instance_tag = NULL;
+
+/*
+ * Match GLib's default writer: DEBUG and INFO are silent unless the
+ * domain (or "all") appears in G_MESSAGES_DEBUG. Without this filter the
+ * custom handler floods the console on every poll/HTTP touch.
+ */
+static gboolean
+stca_log_debug_enabled(const gchar *log_domain)
+{
+  const gchar *domains;
+  const gchar *p;
+  gsize domain_len;
+
+  domains = g_getenv("G_MESSAGES_DEBUG");
+  if (domains == NULL || *domains == '\0')
+    return FALSE;
+
+  if (strcmp(domains, "all") == 0)
+    return TRUE;
+
+  if (log_domain == NULL || *log_domain == '\0')
+    return FALSE;
+
+  domain_len = strlen(log_domain);
+  p = domains;
+  while (*p != '\0')
+    {
+      while (*p == ' ')
+	p++;
+      if (*p == '\0')
+	break;
+      if (strncmp(p, log_domain, domain_len) == 0 &&
+	  (p[domain_len] == '\0' || p[domain_len] == ' '))
+	return TRUE;
+      while (*p != '\0' && *p != ' ')
+	p++;
+    }
+
+  return FALSE;
+}
 
 static void
 stca_log_handler(const gchar *log_domain,
@@ -29,13 +70,20 @@ stca_log_handler(const gchar *log_domain,
 		 const gchar *message,
 		 gpointer user_data)
 {
-  GDateTime *now = g_date_time_new_now_local();
-  gchar *timestamp = g_date_time_format(now, "%Y-%m-%d %H:%M:%S");
+  GDateTime *now = NULL;
+  gchar *timestamp = NULL;
   const gchar *level_str = "UNKNOWN";
   const gchar *color_start = "";
   const gchar *color_end = "\033[0m";
 
   (void) user_data;
+
+  if ((log_level & (G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO)) != 0 &&
+      !stca_log_debug_enabled(log_domain))
+    return;
+
+  now = g_date_time_new_now_local();
+  timestamp = g_date_time_format(now, "%Y-%m-%d %H:%M:%S");
 
   if (log_level & G_LOG_LEVEL_ERROR)
     {
@@ -72,7 +120,7 @@ stca_log_handler(const gchar *log_domain,
 	     timestamp,
 	     color_start, level_str, color_end,
 	     instance_tag,
-	     log_domain,
+	     log_domain != NULL ? log_domain : "?",
 	     message);
 
   g_free(timestamp);
@@ -84,9 +132,10 @@ stca_internals_log_init(const char *argv0)
 {
   const char *base;
 
-  base = strrchr(argv0, '/');
-  instance_tag = g_strdup(base ? base + 1 : argv0);
+  g_free(instance_tag);
+
+  base = argv0 ? strrchr(argv0, '/') : NULL;
+  instance_tag = g_strdup(base ? base + 1 : (argv0 ? argv0 : "unknown"));
 
   g_log_set_default_handler(stca_log_handler, NULL);
-  g_setenv("G_MESSAGES_DEBUG", "all", FALSE);
 }

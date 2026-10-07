@@ -264,8 +264,28 @@ server → @code{stca_plugin_start} → @code{g_main_loop_run}.
 
 The adapter uses GLib message logging. Domains follow component names
 (@code{main}, @code{config}, @code{http}, @code{plugin}, and the
-plugin's own domain). Use the usual GLib environment variables
-(@env{G_MESSAGES_DEBUG}, @dots{}) when debugging.
+plugin's own domain).
+
+@strong{DEBUG} and @strong{INFO} are off by default so the console is not
+flooded on every poll. Enable them with @env{G_MESSAGES_DEBUG}:
+
+@example
+# everything
+G_MESSAGES_DEBUG=all starter-configurable-adapter -c …
+
+# one or more domains (space-separated)
+G_MESSAGES_DEBUG="ariston-remotethermo http" \
+  starter-configurable-adapter -c …
+@end example
+
+Under systemd, set it in the unit:
+
+@example
+[Service]
+Environment=G_MESSAGES_DEBUG=all
+@end example
+
+@strong{WARNING}, @strong{CRITICAL}, and @strong{ERROR} always appear.
 
 From the build tree (example with @code{dummy}):
 
