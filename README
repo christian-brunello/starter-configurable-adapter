@@ -4,23 +4,23 @@ STARTER Configurable Adapter
 1. OVERVIEW
 ===========
 
-starter-configurable-adapter (STCA) is an independent HTTP process that
-loads one plugin to talk to an external source and exposes a common
-numeric JSON API for configurable-service. This tree ships the core and
-the in-tree `dummy` example plugin; product plugins (e.g. Ariston) are
-separate repositories (one plugin per repo).
+starter-configurable-adapter (STCA) loads one plugin to talk to an
+external source and exposes a numeric snapshot over a peer D-Bus TCP
+API (org.starter.Adapter). An optional HTTP/JSON API can be enabled for
+debugging. STCS connects with adapter-transport. This tree ships the
+core and the in-tree `dummy` example; product plugins are separate repos.
 
 Read path:
 
-  plugin  →  signal data-ready (GHashTable)  →  adapter memory  →  GET /data
-  →  configurable-service  →  starter STInput
+  plugin → data-ready → adapter store → D-Bus DataChanged / GetData
+  → STCS adapter-transport + json-reader → starter STInput
 
 Write path:
 
-  starter STOutput  →  configurable-service  →  PUT/POST /data
-  →  stca_plugin_write_value(s)  →  external source
+  starter STOutput → STCS json-writer + adapter-transport → SetData
+  → stca_plugin_write_value(s) → external source
 
-For the technical manual (concepts + configuration/HTTP reference):
+For the technical manual:
 
     $ make -C doc info   # Info
     $ make doc           # PDF (needs TeX)
@@ -48,9 +48,10 @@ For the technical manual (concepts + configuration/HTTP reference):
 
     $ starter-configurable-adapter --config /path/to/adapter.stca.xml
 
-See examples/dummy/ for a temporary plugin that exercises the HTTP API.
+See examples/dummy/ for a temporary plugin that exercises the D-Bus API.
 Out-of-tree plugins are built separately and loaded with `--plugin-dir`.
-Details are in the Texinfo manual.
+Optional HTTP: `--enable-http --http-port=N` or XML enable-http /
+http-listen-port. Details are in the Texinfo manual.
 
 5. LICENSE
 ==========

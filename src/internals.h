@@ -35,6 +35,11 @@ struct _STCAContext {
     gchar *plugin_dir;
     gchar *listen_address;
     guint listen_port;
+    gboolean enable_http;
+    gboolean enable_http_set; /* TRUE if CLI/XML set enable_http */
+    gchar *http_listen_address;
+    guint http_listen_port;
+    gboolean http_listen_port_set;
     gchar *adapter_name;
     gboolean version;
   } options;
@@ -44,6 +49,7 @@ struct _STCAContext {
   gulong data_ready_handler_id;
   /* Adapter-owned refreshed values: gchar* → STCAValue* */
   GHashTable *values;
+  gpointer dbus_server; /* STCADbusServer*, opaque */
   gpointer http_server; /* SoupServer*, opaque here */
 };
 
@@ -54,11 +60,18 @@ void stca_internals_log_init(const char *instance_tag);
 gboolean stca_internals_scan_plugins(STCAContext *context, GError **error);
 gboolean stca_internals_config_parse(STCAContext *context, const gchar *path, GError **error);
 
-/* Merge data-ready payload (gchar* → STCAValue*) into the adapter store. */
-void stca_context_merge_values(STCAContext *context, GHashTable *values);
+/*
+ * Merge data-ready payload (gchar* → STCAValue*) into the adapter store.
+ * Returns a new table of keys whose numeric value changed (transfer full),
+ * or NULL if nothing changed. Caller must unref when non-NULL.
+ */
+GHashTable *stca_context_merge_values(STCAContext *context, GHashTable *values);
 
-/* After a successful write: update numeric values only (gchar* → gdouble*). */
-void stca_context_apply_writes(STCAContext *context, GHashTable *numbers);
+/*
+ * After a successful write: update numeric values only (gchar* → gdouble*).
+ * Returns changed keys as gchar* → STCAValue* (transfer full), or NULL.
+ */
+GHashTable *stca_context_apply_writes(STCAContext *context, GHashTable *numbers);
 
 /* TRUE if key exists and has STCA_ACCESS_WRITE. */
 gboolean stca_context_key_is_writable(STCAContext *context, const gchar *key, GError **error);

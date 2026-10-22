@@ -23,6 +23,8 @@ starter_configurable_adapter_SOURCES = \
 	internals.c \
 	internals.h \
 	config.c \
+	dbus-server.c \
+	dbus-server.h \
 	http-server.c \
 	http-server.h \
 	log.c \

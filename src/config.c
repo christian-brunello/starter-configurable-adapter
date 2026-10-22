@@ -148,6 +148,47 @@ xml_child_content(xmlNodePtr parent, const char *name)
 }
 
 static gboolean
+parse_bool_content(const gchar *tmp, gboolean *out, GError **error, const gchar *tag)
+{
+  if (g_ascii_strcasecmp(tmp, "true") == 0 || g_strcmp0(tmp, "1") == 0)
+    {
+      *out = TRUE;
+      return TRUE;
+    }
+  if (g_ascii_strcasecmp(tmp, "false") == 0 || g_strcmp0(tmp, "0") == 0)
+    {
+      *out = FALSE;
+      return TRUE;
+    }
+
+  g_set_error(error,
+	      G_IO_ERROR,
+	      G_IO_ERROR_INVALID_DATA,
+	      "invalid <%s> `%s' (expected true/false)",
+	      tag, tmp);
+  return FALSE;
+}
+
+static gboolean
+parse_port_content(const gchar *tmp, guint *out, GError **error, const gchar *tag)
+{
+  char *end = NULL;
+  long port = strtol(tmp, &end, 10);
+
+  if (end == tmp || *end != '\0' || port <= 0 || port > 65535)
+    {
+      g_set_error(error,
+		  G_IO_ERROR,
+		  G_IO_ERROR_INVALID_DATA,
+		  "invalid <%s> `%s'", tag, tmp);
+      return FALSE;
+    }
+
+  *out = (guint) port;
+  return TRUE;
+}
+
+static gboolean
 parse_global(STCAContext *context, xmlNodePtr node, GError **error)
 {
   gchar *tmp;
@@ -162,20 +203,54 @@ parse_global(STCAContext *context, xmlNodePtr node, GError **error)
   tmp = xml_child_content(node, "listen-port");
   if (tmp != NULL)
     {
-      char *end = NULL;
-      long port = strtol(tmp, &end, 10);
+      guint port = 0;
 
-      if (end == tmp || *end != '\0' || port <= 0 || port > 65535)
+      if (!parse_port_content(tmp, &port, error, "listen-port"))
 	{
-	  g_set_error(error,
-		      G_IO_ERROR,
-		      G_IO_ERROR_INVALID_DATA,
-		      "invalid listen-port `%s'", tmp);
 	  g_free(tmp);
 	  return FALSE;
 	}
+      context->options.listen_port = port;
+      g_free(tmp);
+    }
 
-      context->options.listen_port = (guint) port;
+  tmp = xml_child_content(node, "enable-http");
+  if (tmp != NULL)
+    {
+      gboolean v = FALSE;
+
+      if (!parse_bool_content(tmp, &v, error, "enable-http"))
+	{
+	  g_free(tmp);
+	  return FALSE;
+	}
+      if (!context->options.enable_http_set)
+	context->options.enable_http = v;
+      g_free(tmp);
+    }
+
+  tmp = xml_child_content(node, "http-listen-address");
+  if (tmp != NULL)
+    {
+      g_free(context->options.http_listen_address);
+      context->options.http_listen_address = tmp;
+    }
+
+  tmp = xml_child_content(node, "http-listen-port");
+  if (tmp != NULL)
+    {
+      guint port = 0;
+
+      if (!parse_port_content(tmp, &port, error, "http-listen-port"))
+	{
+	  g_free(tmp);
+	  return FALSE;
+	}
+      if (!context->options.http_listen_port_set)
+	{
+	  context->options.http_listen_port = port;
+	  context->options.http_listen_port_set = TRUE;
+	}
       g_free(tmp);
     }
 
@@ -357,8 +432,20 @@ stca_internals_config_parse(STCAContext *context, const gchar *path, GError **er
   if (context->options.listen_address == NULL)
     context->options.listen_address = g_strdup("127.0.0.1");
 
+  if (context->options.http_listen_address == NULL)
+    context->options.http_listen_address = g_strdup(context->options.listen_address);
+
   if (context->options.adapter_name == NULL)
     context->options.adapter_name = g_strdup("STCA");
+
+  if (context->options.enable_http && !context->options.http_listen_port_set)
+    {
+      g_set_error(error,
+		  G_IO_ERROR,
+		  G_IO_ERROR_INVALID_DATA,
+		  "enable-http requires <http-listen-port> (or --http-port)");
+      goto out;
+    }
 
   ok = TRUE;
 

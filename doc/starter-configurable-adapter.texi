@@ -69,8 +69,9 @@ outputs using an @acronym{XML} pipeline.
 independent process that sits @emph{in front of} @acronym{STCS}. It loads
 exactly one plugin that talks to a complex external source (cloud
 @acronym{API}, fieldbus, @dots{}), keeps a numeric snapshot in memory, and
-exposes that snapshot over a common @acronym{HTTP}/@acronym{JSON} API.
-@acronym{STCS} can then use its existing @code{http-transport} and
+exposes that snapshot over a peer @acronym{D-Bus} @acronym{TCP} interface
+(@code{org.starter.Adapter}). An optional @acronym{HTTP}/@acronym{JSON}
+API remains available. @acronym{STCS} uses @code{adapter-transport} and
 @code{json-reader} / writers against that API---without embedding the
 source protocol inside the service.
 
@@ -106,22 +107,23 @@ Typical end-to-end flows:
 external source
   → STCA plugin
   → data-ready → adapter store
-  → GET /data (HTTP JSON)
-  → STCS http-transport + json-reader
+  → D-Bus GetData / DataChanged
+  → STCS adapter-transport + json-reader
   → starter STInput
 @end example
 
 @example
 starter STOutput
-  → STCS writer + http-transport
-  → PUT/POST /data (HTTP JSON)
+  → STCS writer + adapter-transport
+  → D-Bus SetData
   → STCA write_value(s)
   → external source
 @end example
 
 Unlike @acronym{STCS}, @acronym{STCA} does @emph{not} own datapoints,
 transports, or starter-core bindings. It owns one plugin instance and one
-in-memory value store, and speaks a fixed numeric @acronym{HTTP} dialect.
+in-memory value store. The default front door is peer @acronym{D-Bus};
+@acronym{HTTP} is opt-in.
 
 @node One Plugin Per Process
 @section One Plugin Per Process
@@ -337,16 +339,30 @@ to @code{stca_plugin_configure()}.
 Document format version. Use @code{1}.
 
 @item global/listen-address
-Address for the @acronym{HTTP} server (default none / all interfaces
-depending on libsoup listen behaviour; examples use @code{127.0.0.1}).
+Bind address for the peer @acronym{D-Bus} server (default @code{127.0.0.1}).
 
 @item global/listen-port
-@acronym{TCP} port (default @code{8080}).
+@acronym{TCP} port for @acronym{D-Bus} (default @code{8080}).
+
+@item global/enable-http
+Optional. @code{true}/@code{false} (default @code{false}). When true,
+requires @code{http-listen-port} (or CLI @option{--http-port}).
+
+@item global/http-listen-address
+Optional @acronym{HTTP} bind address (defaults to @code{listen-address}).
+
+@item global/http-listen-port
+@acronym{TCP} port for the optional @acronym{HTTP} server.
 
 @item global/adapter-name
-Human-readable name returned by @code{GET /info}
+Human-readable name (also returned by @code{GET /info} when HTTP is on)
 (default @code{STCA}).
 @end table
+
+Object path @code{/org/starter/adapter}, interface
+@code{org.starter.Adapter}: methods @code{GetData} / @code{SetData},
+signal @code{DataChanged} (one emission per merge/write with only
+keys whose numeric value changed).
 
 @node Plugin Element Reference
 @section Plugin Element
@@ -379,6 +395,10 @@ $ ./configure --with-stca=/path/to/configurable-adapter
 
 @node HTTP Reference
 @chapter HTTP Reference
+
+Optional front door (off by default). Enable with
+@code{enable-http}/@code{http-listen-port} or
+@option{--enable-http}/@option{--http-port}.
 
 All successful @acronym{JSON} bodies use @code{Content-Type:
 application/json}. Numbers on the write path are plain @acronym{JSON}

@@ -18,6 +18,7 @@
  */
 
 #include "http-server.h"
+#include "dbus-server.h"
 #include "plugin-entry.h"
 #include "autoconf.h"
 
@@ -362,7 +363,14 @@ handle_request(SoupServer *server,
 	  return;
 	}
 
-      stca_context_apply_writes(context, table);
+      {
+	GHashTable *changed = stca_context_apply_writes(context, table);
+	if (changed != NULL)
+	  {
+	    stca_dbus_server_emit_data_changed(context, changed);
+	    g_hash_table_unref(changed);
+	  }
+      }
       g_hash_table_unref(table);
       soup_server_message_set_status(msg, 204, NULL);
       return;
@@ -412,7 +420,14 @@ handle_request(SoupServer *server,
       boxed = g_new(gdouble, 1);
       *boxed = value;
       g_hash_table_insert(table, g_strdup(key), boxed);
-      stca_context_apply_writes(context, table);
+      {
+	GHashTable *changed = stca_context_apply_writes(context, table);
+	if (changed != NULL)
+	  {
+	    stca_dbus_server_emit_data_changed(context, changed);
+	    g_hash_table_unref(changed);
+	  }
+      }
       g_hash_table_unref(table);
       soup_server_message_set_status(msg, 204, NULL);
       return;
@@ -427,20 +442,26 @@ stca_http_server_start(STCAContext *context, GError **error)
   SoupServer *server;
   GSocketAddress *addr;
   GError *local_error = NULL;
+  const gchar *http_addr;
+  guint http_port;
 
   g_return_val_if_fail(context != NULL, FALSE);
 
+  http_addr = context->options.http_listen_address != NULL
+    ? context->options.http_listen_address
+    : context->options.listen_address;
+  http_port = context->options.http_listen_port;
+
   server = soup_server_new("server-header", "starter-configurable-adapter", NULL);
 
-  addr = g_inet_socket_address_new_from_string(context->options.listen_address,
-					       context->options.listen_port);
+  addr = g_inet_socket_address_new_from_string(http_addr, http_port);
   if (addr == NULL)
     {
       g_set_error(error,
 		  G_IO_ERROR,
 		  G_IO_ERROR_INVALID_DATA,
-		  "invalid listen-address `%s'",
-		  context->options.listen_address);
+		  "invalid http-listen-address `%s'",
+		  http_addr);
       g_object_unref(server);
       return FALSE;
     }
@@ -458,9 +479,7 @@ stca_http_server_start(STCAContext *context, GError **error)
   soup_server_add_handler(server, NULL, handle_request, context, NULL);
   context->http_server = server;
 
-  LOGI("HTTP server listening on %s:%u",
-       context->options.listen_address,
-       context->options.listen_port);
+  LOGI("HTTP server listening on %s:%u", http_addr, http_port);
   return TRUE;
 }
 
@@ -578,7 +597,14 @@ handle_request2(SoupServer *server,
 	  return;
 	}
 
-      stca_context_apply_writes(context, table);
+      {
+	GHashTable *changed = stca_context_apply_writes(context, table);
+	if (changed != NULL)
+	  {
+	    stca_dbus_server_emit_data_changed(context, changed);
+	    g_hash_table_unref(changed);
+	  }
+      }
       g_hash_table_unref(table);
       soup_message_set_status(msg, SOUP_STATUS_NO_CONTENT);
       return;
@@ -623,7 +649,14 @@ handle_request2(SoupServer *server,
       boxed = g_new(gdouble, 1);
       *boxed = value;
       g_hash_table_insert(table, g_strdup(key), boxed);
-      stca_context_apply_writes(context, table);
+      {
+	GHashTable *changed = stca_context_apply_writes(context, table);
+	if (changed != NULL)
+	  {
+	    stca_dbus_server_emit_data_changed(context, changed);
+	    g_hash_table_unref(changed);
+	  }
+      }
       g_hash_table_unref(table);
       soup_message_set_status(msg, SOUP_STATUS_NO_CONTENT);
       return;
@@ -638,17 +671,24 @@ stca_http_server_start(STCAContext *context, GError **error)
 {
   SoupServer *server;
   SoupAddress *addr;
+  const gchar *http_addr;
+  guint http_port;
 
   g_return_val_if_fail(context != NULL, FALSE);
 
-  addr = soup_address_new(context->options.listen_address, context->options.listen_port);
+  http_addr = context->options.http_listen_address != NULL
+    ? context->options.http_listen_address
+    : context->options.listen_address;
+  http_port = context->options.http_listen_port;
+
+  addr = soup_address_new(http_addr, http_port);
   if (addr == NULL || soup_address_resolve_sync(addr, NULL) != SOUP_STATUS_OK)
     {
       g_set_error(error,
 		  G_IO_ERROR,
 		  G_IO_ERROR_INVALID_DATA,
-		  "invalid listen-address `%s'",
-		  context->options.listen_address);
+		  "invalid http-listen-address `%s'",
+		  http_addr);
       if (addr)
 	g_object_unref(addr);
       return FALSE;
@@ -667,9 +707,7 @@ stca_http_server_start(STCAContext *context, GError **error)
   soup_server_run_async(server);
   context->http_server = server;
 
-  LOGI("HTTP server listening on %s:%u",
-       context->options.listen_address,
-       context->options.listen_port);
+  LOGI("HTTP server listening on %s:%u", http_addr, http_port);
   return TRUE;
 }
 

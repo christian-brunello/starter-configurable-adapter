@@ -21,6 +21,7 @@
 #include <libxml/parser.h>
 
 #include "internals.h"
+#include "dbus-server.h"
 #include "http-server.h"
 
 #define LOGD(msg...) g_log("main", G_LOG_LEVEL_DEBUG, msg)
@@ -32,6 +33,8 @@
 static gboolean
 parse_cli(STCAContext *context, int *argc, char ***argv, GError **error)
 {
+  gint http_port = -1;
+  gboolean enable_http = FALSE;
   GOptionEntry cli_entries[] = {
     { "config", 'c', 0, G_OPTION_ARG_FILENAME, &context->options.config_file,
       "Path to the adapter configuration file", "FILE" },
@@ -39,6 +42,10 @@ parse_cli(STCAContext *context, int *argc, char ***argv, GError **error)
       "Command to preprocess config file ({F} = path); empty disables", "CMD" },
     { "plugin-dir", 'p', 0, G_OPTION_ARG_FILENAME, &context->options.plugin_dir,
       "Path to the plugins directory", "DIR" },
+    { "enable-http", 0, 0, G_OPTION_ARG_NONE, &enable_http,
+      "Enable optional HTTP/JSON API (also needs --http-port or XML http-listen-port)", NULL },
+    { "http-port", 0, 0, G_OPTION_ARG_INT, &http_port,
+      "HTTP listen port (implies --enable-http)", "PORT" },
     { "version", 'V', 0, G_OPTION_ARG_NONE, &context->options.version,
       "Show software version and exit", NULL },
     { NULL }
@@ -51,7 +58,29 @@ parse_cli(STCAContext *context, int *argc, char ***argv, GError **error)
   g_option_context_add_main_entries(opt_context, cli_entries, NULL);
   r = g_option_context_parse(opt_context, argc, argv, error);
   g_option_context_free(opt_context);
-  return r;
+
+  if (!r)
+    return FALSE;
+
+  if (enable_http || http_port > 0)
+    {
+      context->options.enable_http = TRUE;
+      context->options.enable_http_set = TRUE;
+    }
+
+  if (http_port > 0)
+    {
+      if (http_port > 65535)
+	{
+	  g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+		      "invalid --http-port %d", http_port);
+	  return FALSE;
+	}
+      context->options.http_listen_port = (guint) http_port;
+      context->options.http_listen_port_set = TRUE;
+    }
+
+  return TRUE;
 }
 
 static void
@@ -80,10 +109,16 @@ static void
 on_data_ready(STCAPlugin *plugin, GHashTable *values, gpointer user_data)
 {
   STCAContext *context = user_data;
+  GHashTable *changed;
 
   (void) plugin;
-  stca_context_merge_values(context, values);
+  changed = stca_context_merge_values(context, values);
   LOGD("merged %u values from data-ready", g_hash_table_size(values));
+  if (changed != NULL)
+    {
+      stca_dbus_server_emit_data_changed(context, changed);
+      g_hash_table_unref(changed);
+    }
 }
 
 static void
@@ -101,6 +136,7 @@ adapter_shutdown(STCAContext *context)
     }
 
   stca_http_server_stop(context);
+  stca_dbus_server_stop(context);
 
   if (context->plugin != NULL && context->data_ready_handler_id != 0)
     {
@@ -172,13 +208,25 @@ main(int argc, char *argv[])
     g_signal_connect(context.plugin, "data-ready",
 		     G_CALLBACK(on_data_ready), &context);
 
-  if (!stca_http_server_start(&context, &error))
+  if (!stca_dbus_server_start(&context, &error))
     {
-      LOGE("HTTP server start failed: %s", error ? error->message : "unknown");
+      LOGE("D-Bus server start failed: %s", error ? error->message : "unknown");
       g_clear_error(&error);
       adapter_shutdown(&context);
       stca_internals_context_finalize(&context);
       return EXIT_FAILURE;
+    }
+
+  if (context.options.enable_http)
+    {
+      if (!stca_http_server_start(&context, &error))
+	{
+	  LOGE("HTTP server start failed: %s", error ? error->message : "unknown");
+	  g_clear_error(&error);
+	  adapter_shutdown(&context);
+	  stca_internals_context_finalize(&context);
+	  return EXIT_FAILURE;
+	}
     }
 
   if (!stca_plugin_start(context.plugin, &error))
@@ -190,7 +238,11 @@ main(int argc, char *argv[])
       return EXIT_FAILURE;
     }
 
-  LOGI("adapter online (plugin=%s)", context.plugin_name);
+  LOGI("adapter online (plugin=%s dbus=%s:%u http=%s)",
+       context.plugin_name,
+       context.options.listen_address,
+       context.options.listen_port,
+       context.options.enable_http ? "on" : "off");
 
   loop = g_main_loop_new(NULL, FALSE);
   g_main_loop_run(loop);

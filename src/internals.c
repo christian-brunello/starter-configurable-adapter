@@ -27,40 +27,68 @@
 #define LOGI(msg...) g_log("plugin", G_LOG_LEVEL_INFO, msg)
 #define LOGE(msg...) g_log("plugin", G_LOG_LEVEL_CRITICAL, msg)
 
-void
+GHashTable *
 stca_context_merge_values(STCAContext *context, GHashTable *values)
 {
   GHashTableIter iter;
   gpointer key;
   gpointer value;
+  GHashTable *changed;
 
-  g_return_if_fail(context != NULL);
-  g_return_if_fail(context->values != NULL);
-  g_return_if_fail(values != NULL);
+  g_return_val_if_fail(context != NULL, NULL);
+  g_return_val_if_fail(context->values != NULL, NULL);
+  g_return_val_if_fail(values != NULL, NULL);
+
+  changed = g_hash_table_new_full(g_str_hash,
+				  g_str_equal,
+				  g_free,
+				  (GDestroyNotify) stca_value_free);
 
   g_hash_table_iter_init(&iter, values);
   while (g_hash_table_iter_next(&iter, &key, &value))
     {
       const gchar *k = key;
       const STCAValue *v = value;
+      STCAValue *stored;
+      gboolean value_changed;
 
       if (k == NULL || v == NULL)
 	continue;
 
+      stored = g_hash_table_lookup(context->values, k);
+      value_changed = (stored == NULL || stored->value != v->value);
+
       g_hash_table_replace(context->values, g_strdup(k), stca_value_copy(v));
+
+      if (value_changed)
+	g_hash_table_replace(changed, g_strdup(k), stca_value_copy(v));
     }
+
+  if (g_hash_table_size(changed) == 0)
+    {
+      g_hash_table_unref(changed);
+      return NULL;
+    }
+
+  return changed;
 }
 
-void
+GHashTable *
 stca_context_apply_writes(STCAContext *context, GHashTable *numbers)
 {
   GHashTableIter iter;
   gpointer key;
   gpointer value;
+  GHashTable *changed;
 
-  g_return_if_fail(context != NULL);
-  g_return_if_fail(context->values != NULL);
-  g_return_if_fail(numbers != NULL);
+  g_return_val_if_fail(context != NULL, NULL);
+  g_return_val_if_fail(context->values != NULL, NULL);
+  g_return_val_if_fail(numbers != NULL, NULL);
+
+  changed = g_hash_table_new_full(g_str_hash,
+				  g_str_equal,
+				  g_free,
+				  (GDestroyNotify) stca_value_free);
 
   g_hash_table_iter_init(&iter, numbers);
   while (g_hash_table_iter_next(&iter, &key, &value))
@@ -73,9 +101,23 @@ stca_context_apply_writes(STCAContext *context, GHashTable *numbers)
 	continue;
 
       stored = g_hash_table_lookup(context->values, k);
-      if (stored != NULL)
-	stored->value = *n;
+      if (stored == NULL)
+	continue;
+
+      if (stored->value == *n)
+	continue;
+
+      stored->value = *n;
+      g_hash_table_replace(changed, g_strdup(k), stca_value_copy(stored));
     }
+
+  if (g_hash_table_size(changed) == 0)
+    {
+      g_hash_table_unref(changed);
+      return NULL;
+    }
+
+  return changed;
 }
 
 gboolean
@@ -140,6 +182,7 @@ stca_internals_context_finalize(STCAContext *context)
   g_free(context->options.config_preprocessor);
   g_free(context->options.plugin_dir);
   g_free(context->options.listen_address);
+  g_free(context->options.http_listen_address);
   g_free(context->options.adapter_name);
 
   if (context->values != NULL)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  STCA:Dummy - temporary plugin for exercising the common HTTP API.
+  STCA:Dummy - temporary plugin for exercising the D-Bus API (and optional HTTP).
 
   Run from the build tree (after make), for example:
 
@@ -9,18 +9,19 @@
       -c examples/dummy/dummy.stca.xml \
       -p plugins/dummy/.libs
 
-  Then:
+  D-Bus (default): peer TCP at listen-address:listen-port
+    interface org.starter.Adapter on /org/starter/adapter
 
-    curl http://127.0.0.1:8080/health
-    curl http://127.0.0.1:8080/data
-    curl -X PUT http://127.0.0.1:8080/data/setpoint \
-      -d '22.5' -H 'Content-Type: application/json'
-    # temperature is read-only and returns 403
+  Optional HTTP: enable in XML (enable-http + http-listen-port)
+  or pass CLI flags enable-http and http-port.
+
+    curl http://127.0.0.1:18081/health
+    curl http://127.0.0.1:18081/data
 -->
 <stca version="1">
   <global>
     <listen-address>127.0.0.1</listen-address>
-    <listen-port>8080</listen-port>
+    <listen-port>18080</listen-port>
     <adapter-name>STCA:Dummy</adapter-name>
   </global>
   <plugin name="dummy">

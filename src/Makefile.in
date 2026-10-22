@@ -126,6 +126,7 @@ am_starter_configurable_adapter_OBJECTS =  \
 	starter_configurable_adapter-main.$(OBJEXT) \
 	starter_configurable_adapter-internals.$(OBJEXT) \
 	starter_configurable_adapter-config.$(OBJEXT) \
+	starter_configurable_adapter-dbus-server.$(OBJEXT) \
 	starter_configurable_adapter-http-server.$(OBJEXT) \
 	starter_configurable_adapter-log.$(OBJEXT) \
 	starter_configurable_adapter-plugin-entry.$(OBJEXT)
@@ -159,6 +160,7 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade =  \
 	./$(DEPDIR)/starter_configurable_adapter-config.Po \
+	./$(DEPDIR)/starter_configurable_adapter-dbus-server.Po \
 	./$(DEPDIR)/starter_configurable_adapter-http-server.Po \
 	./$(DEPDIR)/starter_configurable_adapter-internals.Po \
 	./$(DEPDIR)/starter_configurable_adapter-log.Po \
@@ -347,6 +349,8 @@ starter_configurable_adapter_SOURCES = \
 	internals.c \
 	internals.h \
 	config.c \
+	dbus-server.c \
+	dbus-server.h \
 	http-server.c \
 	http-server.h \
 	log.c \
@@ -473,6 +477,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starter_configurable_adapter-config.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starter_configurable_adapter-dbus-server.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starter_configurable_adapter-http-server.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starter_configurable_adapter-internals.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starter_configurable_adapter-log.Po@am__quote@ # am--include-marker
@@ -547,6 +552,20 @@ starter_configurable_adapter-config.obj: config.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='config.c' object='starter_configurable_adapter-config.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(starter_configurable_adapter_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o starter_configurable_adapter-config.obj `if test -f 'config.c'; then $(CYGPATH_W) 'config.c'; else $(CYGPATH_W) '$(srcdir)/config.c'; fi`
+
+starter_configurable_adapter-dbus-server.o: dbus-server.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(starter_configurable_adapter_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT starter_configurable_adapter-dbus-server.o -MD -MP -MF $(DEPDIR)/starter_configurable_adapter-dbus-server.Tpo -c -o starter_configurable_adapter-dbus-server.o `test -f 'dbus-server.c' || echo '$(srcdir)/'`dbus-server.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/starter_configurable_adapter-dbus-server.Tpo $(DEPDIR)/starter_configurable_adapter-dbus-server.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dbus-server.c' object='starter_configurable_adapter-dbus-server.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(starter_configurable_adapter_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o starter_configurable_adapter-dbus-server.o `test -f 'dbus-server.c' || echo '$(srcdir)/'`dbus-server.c
+
+starter_configurable_adapter-dbus-server.obj: dbus-server.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(starter_configurable_adapter_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT starter_configurable_adapter-dbus-server.obj -MD -MP -MF $(DEPDIR)/starter_configurable_adapter-dbus-server.Tpo -c -o starter_configurable_adapter-dbus-server.obj `if test -f 'dbus-server.c'; then $(CYGPATH_W) 'dbus-server.c'; else $(CYGPATH_W) '$(srcdir)/dbus-server.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/starter_configurable_adapter-dbus-server.Tpo $(DEPDIR)/starter_configurable_adapter-dbus-server.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='dbus-server.c' object='starter_configurable_adapter-dbus-server.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(starter_configurable_adapter_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o starter_configurable_adapter-dbus-server.obj `if test -f 'dbus-server.c'; then $(CYGPATH_W) 'dbus-server.c'; else $(CYGPATH_W) '$(srcdir)/dbus-server.c'; fi`
 
 starter_configurable_adapter-http-server.o: http-server.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(starter_configurable_adapter_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT starter_configurable_adapter-http-server.o -MD -MP -MF $(DEPDIR)/starter_configurable_adapter-http-server.Tpo -c -o starter_configurable_adapter-http-server.o `test -f 'http-server.c' || echo '$(srcdir)/'`http-server.c
@@ -723,6 +742,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
 
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/starter_configurable_adapter-config.Po
+	-rm -f ./$(DEPDIR)/starter_configurable_adapter-dbus-server.Po
 	-rm -f ./$(DEPDIR)/starter_configurable_adapter-http-server.Po
 	-rm -f ./$(DEPDIR)/starter_configurable_adapter-internals.Po
 	-rm -f ./$(DEPDIR)/starter_configurable_adapter-log.Po
@@ -774,6 +794,7 @@ installcheck-am:
 
 maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/starter_configurable_adapter-config.Po
+	-rm -f ./$(DEPDIR)/starter_configurable_adapter-dbus-server.Po
 	-rm -f ./$(DEPDIR)/starter_configurable_adapter-http-server.Po
 	-rm -f ./$(DEPDIR)/starter_configurable_adapter-internals.Po
 	-rm -f ./$(DEPDIR)/starter_configurable_adapter-log.Po
